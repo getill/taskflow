@@ -169,3 +169,9 @@ docker compose up -d --wait
 ```
 
 Docker télécharge les images manquantes. Le site est ensuite accessible sur `http://localhost:8080`.
+
+## Dépôts publics et vérification
+
+Les dépôts [taskflow-api](https://hub.docker.com/r/tlemray/taskflow-api) et [taskflow-front](https://hub.docker.com/r/tlemray/taskflow-front) sont publics. On a vérifié l'accès aux deux versions `1.0.0` sans connexion au compte Docker Hub. Ces images sont publiées pour Linux amd64.
+
+On a ensuite arrêté la stack sans supprimer les volumes, supprimé les images locales de l'API, du front et de PostgreSQL, puis relancé avec `docker compose up -d --wait`. Docker a bien téléchargé les trois images, sans rien construire. Le site et l'API fonctionnent, et les tâches présentes avant le test ont été conservées.
