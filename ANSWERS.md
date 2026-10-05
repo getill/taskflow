@@ -118,3 +118,23 @@ Pour arrêter la stack en gardant les données :
 ```sh
 docker compose down
 ```
+
+## Mot de passe
+
+Le mot de passe est uniquement dans le fichier `.env` local, ignoré par Git. Le `compose.yaml` utilise la variable `DB_PASSWORD` et le fichier `.env.example` laisse sa valeur vide.
+
+On a contrôlé le résultat de `docker compose config` : l'API et PostgreSQL reçoivent bien le même mot de passe. Sa valeur n'apparaît dans aucun fichier destiné à être versionné. La sortie de cette commande contient le mot de passe résolu : elle ne doit donc pas être enregistrée dans Git.
+
+## Attendre que la base soit prête
+
+Le contrôle de santé de PostgreSQL utilise `pg_isready` pour vérifier qu'il accepte les connexions. Avec `depends_on` et `condition: service_healthy`, Compose attend ce résultat avant de démarrer l'API. Un simple `depends_on` sans cette condition ne suffit pas.
+
+## Ports publiés
+
+Seul le port local `8080` est publié, pour ouvrir le site dans le navigateur. Nginx transmet ensuite les appels à l'API sur le réseau Docker. Les ports `3000` de l'API et `5432` de PostgreSQL restent internes : le navigateur n'a pas besoin d'y accéder directement.
+
+## Vérification après arrêt et relance
+
+On a créé deux tâches, arrêté la stack avec `docker compose down`, puis relancé avec `docker compose up -d --wait`. Les deux tâches sont toujours présentes et restent visibles sur le site.
+
+Le volume a été conservé car on n'a pas utilisé l'option `-v`. PostgreSQL écrit bien dans `/var/lib/postgresql/18/docker`, à l'intérieur du volume monté sur `/var/lib/postgresql`.
