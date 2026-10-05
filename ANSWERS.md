@@ -138,3 +138,24 @@ Seul le port local `8080` est publié, pour ouvrir le site dans le navigateur. N
 On a créé deux tâches, arrêté la stack avec `docker compose down`, puis relancé avec `docker compose up -d --wait`. Les deux tâches sont toujours présentes et restent visibles sur le site.
 
 Le volume a été conservé car on n'a pas utilisé l'option `-v`. PostgreSQL écrit bien dans `/var/lib/postgresql/18/docker`, à l'intérieur du volume monté sur `/var/lib/postgresql`.
+
+# Étape 6
+
+## Connexion à Docker Hub
+
+On utilise `docker login --username tlemray`, puis on saisit un Personal Access Token à la place du mot de passe. Le jeton doit autoriser la lecture et l'écriture pour publier les images. Il reste dans le gestionnaire d'identifiants Docker, jamais dans le dépôt. Voir la [documentation Docker sur les jetons](https://docs.docker.com/security/access-tokens/).
+
+## Nom et version des images
+
+La convention est `utilisateur/nom-image:version`. On utilise le tag `1.0.0` pour identifier cette version de l'API et du front.
+
+Avec seulement `latest`, on ne sait pas quelle version est déployée : ce tag peut désigner une nouvelle image à chaque publication. Un tag de version rend le suivi plus clair, à condition de ne pas le réutiliser pour un autre contenu. Le digest permet d'identifier exactement l'image.
+
+Les images du projet sont `tlemray/taskflow-api:1.0.0` et `tlemray/taskflow-front:1.0.0`. Pour les construire et les publier depuis la racine du projet :
+
+```sh
+docker build -t tlemray/taskflow-api:1.0.0 .
+docker build -f front/Dockerfile -t tlemray/taskflow-front:1.0.0 .
+docker push tlemray/taskflow-api:1.0.0
+docker push tlemray/taskflow-front:1.0.0
+```
