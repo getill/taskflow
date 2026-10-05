@@ -39,3 +39,49 @@ L'API se lance, puis s'arrête après six tentatives de connexion avec le messag
 On a testé `docker stop` pendant que l'API attendait la base de données. Le conteneur s'est arrêté proprement en environ 0,16 seconde. Les logs affichent « Signal SIGTERM reçu : arrêt en cours », puis « Arrêt terminé ».
 
 Le Dockerfile utilise `CMD ["node", "src/server.js"]` : Node.js reçoit directement le signal d'arrêt et l'application le prend en charge. Une attente d'environ dix secondes peut indiquer que le signal n'arrive pas à l'application ou qu'elle ne le traite pas ; Docker finit alors par forcer l'arrêt.
+
+# Étape 4
+
+## Compiler et servir le front
+
+Le fichier `front/Dockerfile` utilise deux étapes. La première utilise Node.js pour installer les dépendances et compiler le front. La seconde garde uniquement Nginx et les fichiers du site générés. Les outils de compilation ne sont donc pas dans l'image finale.
+
+Pour construire l'image depuis la racine du projet :
+
+```sh
+docker build -f front/Dockerfile -t taskflow-front .
+```
+
+## Taille de l'image
+
+On a comparé les tailles avec :
+
+```sh
+docker images --filter reference=taskflow-front --filter reference=nginx:stable-alpine
+```
+
+Docker affiche 92,9 Mo pour le front et 93,6 Mo pour la base Nginx. Les deux restent donc autour de 93 Mo. On a aussi vérifié que l'image finale ne contient ni Node.js, ni npm, ni dossier `node_modules` dans les fichiers du site.
+
+## Transmettre les requêtes à l'API
+
+C'est Nginx qui reçoit les requêtes du navigateur et transmet celles qui commencent par `/api/` à l'API. Son adresse est donnée au démarrage avec la variable `API_URL`, par défaut `http://api:3000`.
+
+Pour lancer le front :
+
+```sh
+docker network create taskflow
+docker run --rm --name front --network taskflow -p 8080:80 \
+  -e API_URL=http://api:3000 taskflow-front
+```
+
+Le site est accessible sur `http://localhost:8080`. Pour que les appels à l'API fonctionnent, son conteneur doit aussi être lancé sur le réseau `taskflow`, avec le nom `api`, et disposer de sa base de données. Docker permet alors à Nginx de trouver l'API grâce à ce nom. `API_URL` doit contenir l'adresse et le port, sans `/api` ni barre oblique à la fin.
+
+On a vérifié l'accueil, le rechargement de `/a-propos` et le transfert des requêtes avec une API simulée. Le site peut démarrer sans API, mais ses appels à l'API échoueront tant qu'elle reste indisponible.
+
+## Utiliser la même image dans plusieurs environnements
+
+Une variable utilisée pendant la compilation reste figée dans les fichiers du site. Changer sa valeur au lancement ne les modifierait pas : il faudrait reconstruire l'image.
+
+Ici, le navigateur utilise toujours `/api/...` et l'adresse de l'API est réglée dans Nginx au démarrage. On peut donc déployer la même image en développement, en test ou en production, en changeant simplement `API_URL`.
+
+Ce réglage au démarrage utilise le mécanisme fourni par l'[image officielle Nginx](https://hub.docker.com/_/nginx).
