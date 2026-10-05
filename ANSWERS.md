@@ -85,3 +85,36 @@ Une variable utilisée pendant la compilation reste figée dans les fichiers du 
 Ici, le navigateur utilise toujours `/api/...` et l'adresse de l'API est réglée dans Nginx au démarrage. On peut donc déployer la même image en développement, en test ou en production, en changeant simplement `API_URL`.
 
 Ce réglage au démarrage utilise le mécanisme fourni par l'[image officielle Nginx](https://hub.docker.com/_/nginx).
+
+# Étape 5
+
+## Lancer les trois services
+
+Le fichier `compose.yaml` lance la base de données, l'API et le front ensemble. L'API attend que la base soit prête, puis le front démarre. Les services se trouvent grâce à leurs noms : `db` pour PostgreSQL et `api` pour l'API.
+
+Un fichier `.env` local a été préparé avec un mot de passe généré. Sur une nouvelle machine, copier `.env.example` vers `.env` et y choisir un mot de passe avant le premier lancement.
+
+```sh
+docker compose up -d --build --wait
+```
+
+L'application est accessible sur `http://localhost:8080`. Seul le port du front est publié sur la machine.
+
+## Image et stockage de PostgreSQL
+
+On utilise l'image officielle `postgres:18`, avec une version majeure explicite. Pour cette version, le volume doit être monté sur `/var/lib/postgresql` ; les données sont rangées dans `/var/lib/postgresql/18/docker`. Jusqu'à PostgreSQL 17, le point de montage par défaut était `/var/lib/postgresql/data`. Ce changement a été vérifié dans la [documentation officielle](https://hub.docker.com/_/postgres).
+
+Le volume `postgres_data` conserve les données même si le conteneur est recréé. On l'a vérifié avec une tâche temporaire : elle était toujours présente après recréation du conteneur PostgreSQL. La création, la modification et la suppression d'une tâche via le front ont aussi été testées.
+
+Pour voir l'état des services ou leurs logs :
+
+```sh
+docker compose ps
+docker compose logs -f
+```
+
+Pour arrêter la stack en gardant les données :
+
+```sh
+docker compose down
+```
