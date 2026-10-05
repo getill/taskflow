@@ -1,0 +1,15 @@
+# Dépendances locales et fichiers générés
+**/node_modules
+**/dist
+**/coverage
+**/*.log
+
+# Configuration locale et historique Git
+.git
+**/.env
+**/.env.*
+!**/.env.example
+**/.vscode
+**/.idea
+**/.DS_Store
+**/Thumbs.db
