@@ -159,3 +159,13 @@ docker build -f front/Dockerfile -t tlemray/taskflow-front:1.0.0 .
 docker push tlemray/taskflow-api:1.0.0
 docker push tlemray/taskflow-front:1.0.0
 ```
+
+## Lancer sans construire
+
+Le `compose.yaml` utilise maintenant les images Docker Hub à la place des sections `build`. Sur une autre machine, il suffit de récupérer `compose.yaml` et `.env.example`, de copier ce dernier vers `.env` et d'y choisir un mot de passe pour la base. Puis :
+
+```sh
+docker compose up -d --wait
+```
+
+Docker télécharge les images manquantes. Le site est ensuite accessible sur `http://localhost:8080`.
