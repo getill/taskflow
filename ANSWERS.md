@@ -1,3 +1,4 @@
+# Séance 1
 # Étape 3
 
 ## Choix de l'image de base
@@ -175,3 +176,56 @@ Docker télécharge les images manquantes. Le site est ensuite accessible sur `h
 Les dépôts [taskflow-api](https://hub.docker.com/r/tlemray/taskflow-api) et [taskflow-front](https://hub.docker.com/r/tlemray/taskflow-front) sont publics. On a vérifié l'accès aux deux versions `1.0.0` sans connexion au compte Docker Hub. Ces images sont publiées pour Linux amd64.
 
 On a ensuite arrêté la stack sans supprimer les volumes, supprimé les images locales de l'API, du front et de PostgreSQL, puis relancé avec `docker compose up -d --wait`. Docker a bien téléchargé les trois images, sans rien construire. Le site et l'API fonctionnent, et les tâches présentes avant le test ont été conservées.
+
+# Séance 2 — TP Kubernetes
+
+## Partie 1 — Fondamentaux et orchestration avec K3s
+
+Périmètre demandé : étapes 1 à 7 incluses. L'étape 8 et les suivantes ne sont pas traitées.
+
+### Étapes 1 à 3 — Préparation, installation et accès distant
+
+On a préparé le cluster en suivant le guide d'installation avant de commencer les exercices du TP. La VM VirtualBox `k3s-lab` utilise Ubuntu Server 24.04.5 LTS, en architecture amd64. Elle possède deux cartes réseau :
+
+| Interface dans la VM | Mode VirtualBox | Adresse | Usage |
+| --- | --- | --- | --- |
+| `enp0s3` | NAT | `10.0.2.15/24` | Accès à Internet |
+| `enp0s8` | Réseau privé hôte (`vboxnet0`) | `192.168.56.10/24` | Accès depuis Zorin |
+
+L'accès SSH par clé fonctionne avec `ssh illy@192.168.56.10`. Le système a été mis à jour, l'horloge est synchronisée et UFW est inactif. Un instantané `avant-k3s` a été pris avant l'installation du cluster.
+
+On a créé `/etc/rancher/k3s/config.yaml` dans la VM avant de lancer le script d'installation :
+
+```yaml
+node-ip: 192.168.56.10
+flannel-iface: enp0s8
+tls-san:
+  - 192.168.56.10
+write-kubeconfig-mode: "0644"
+```
+
+Le nœud annonce ainsi l'adresse du réseau privé, également présente dans son certificat. Le mode `0644`, utilisé ici pour le laboratoire, rend le kubeconfig administrateur lisible par les utilisateurs de la VM.
+
+K3s est installé en version `v1.36.5+k3s1`. Le service est actif et le nœud `k3s-lab` est `Ready`, avec `192.168.56.10` comme `INTERNAL-IP`. Les composants système sont `Running` et les tâches d'installation de Traefik sont `Completed`.
+
+Sur Zorin, on utilise `kubectl v1.36.5` et `Helm v4.3.0`. Le kubeconfig est enregistré dans `~/.kube/k3s-lab.yaml`, avec des droits `600`. Contrairement au nom `~/.kube/config` proposé dans le TP, on utilise un fichier dédié, sélectionné par cette ligne dans `~/.zshrc` :
+
+```sh
+export KUBECONFIG="$HOME/.kube/k3s-lab.yaml"
+```
+
+Le contexte a été renommé `k3s-lab` et l'adresse du serveur remplacée par `https://192.168.56.10:6443`. Le kubeconfig reste hors du dépôt car il contient les accès administrateur.
+
+Les vérifications suivantes ont été réalisées depuis Zorin :
+
+| Vérification | Résultat observé |
+| --- | --- |
+| `kubectl config current-context` | `k3s-lab`, également dans un nouveau terminal |
+| `kubectl get nodes -o wide` | Nœud `Ready`, adresse `192.168.56.10` |
+| `kubectl cluster-info` | API accessible sur `https://192.168.56.10:6443` |
+| `kubectl auth can-i '*' '*'` | `yes` : droits administrateur |
+| Pod `test` avec `nginx:1.28-alpine`, puis `kubectl port-forward pod/test 8080:80` | Page « Welcome to nginx! » accessible sur `http://localhost:8080` |
+| `curl -i http://192.168.56.10` | `404 Not Found` : Traefik répond, sans route applicative configurée |
+| `helm list -A` | `traefik` et `traefik-crd` en état `deployed` dans `kube-system` |
+
+Le Pod `test` utilisé pour valider l'installation a ensuite été supprimé. Il est distinct du Pod `pod-test` demandé à l'étape 4 du TP.
