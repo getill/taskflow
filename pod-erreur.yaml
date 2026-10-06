@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-erreur
+spec:
+  containers:
+    - name: nginx-container
+      image: nginx:9.9.9

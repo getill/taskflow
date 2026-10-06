@@ -278,3 +278,18 @@ La section `Events` montre les étapes suivantes, toutes de type `Normal` :
 Les logs affichent `Configuration complete; ready for start up`, puis `nginx/1.25.5` et `start worker processes`, suivi du lancement de deux processus workers. Ils confirment le démarrage de Nginx sans erreur visible. Le tag `nginx:1.25` utilisé dans cet exercice correspond donc ici à la version 1.25.5.
 
 `get` résume l'état des Pods ; `describe` détaille leur configuration et les événements Kubernetes ; `logs` affiche les messages produits par le conteneur.
+
+### Étape 5 — Erreur d'image et diagnostic
+
+On a créé `pod-erreur.yaml` avec l'image volontairement inexistante `nginx:9.9.9`, puis exécuté :
+
+```sh
+kubectl apply -f pod-erreur.yaml
+kubectl get pod pod-erreur -w
+# Après Ctrl+C pour arrêter l'observation :
+kubectl describe pod pod-erreur
+```
+
+Le Pod a été accepté et affecté au nœud `k3s-lab` (`Scheduled`), mais le téléchargement de l'image a échoué. Les événements affichent `ErrImagePull`, `ImagePullBackOff` et le message précis `docker.io/library/nginx:9.9.9: not found`, avec le code `NotFound`.
+
+La cause est donc le tag inexistant, et non une erreur de syntaxe YAML ou d'ordonnancement. Kubernetes accepte la description du Pod avant que le kubelet tente de récupérer l'image. `ErrImagePull` signale l'échec du téléchargement ; `ImagePullBackOff` indique que Kubernetes attend avant une nouvelle tentative, en espaçant progressivement les essais. Les événements montrent déjà deux tentatives de téléchargement.
