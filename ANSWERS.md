@@ -293,3 +293,46 @@ kubectl describe pod pod-erreur
 Le Pod a été accepté et affecté au nœud `k3s-lab` (`Scheduled`), mais le téléchargement de l'image a échoué. Les événements affichent `ErrImagePull`, `ImagePullBackOff` et le message précis `docker.io/library/nginx:9.9.9: not found`, avec le code `NotFound`.
 
 La cause est donc le tag inexistant, et non une erreur de syntaxe YAML ou d'ordonnancement. Kubernetes accepte la description du Pod avant que le kubelet tente de récupérer l'image. `ErrImagePull` signale l'échec du téléchargement ; `ImagePullBackOff` indique que Kubernetes attend avant une nouvelle tentative, en espaçant progressivement les essais. Les événements montrent déjà deux tentatives de téléchargement.
+
+### Étapes 6A et 6B — Exécuter des commandes dans un conteneur
+
+Depuis le terminal SSH de la VM, on a ouvert un shell dans `pod-web` :
+
+```sh
+kubectl exec -it pod-web -- /bin/bash
+ls /etc/nginx/
+exit
+```
+
+L'invite est devenue `root@pod-web:/#`, confirmant que le shell s'exécutait dans le conteneur. L'option `-i` maintient l'entrée standard ouverte, `-t` alloue un terminal et `--` sépare les arguments de `kubectl` de la commande à lancer dans le conteneur.
+
+Le dossier `/etc/nginx/` contient `conf.d`, `fastcgi_params`, `mime.types`, `modules`, `nginx.conf`, `scgi_params` et `uwsgi_params`. La commande `exit` a fermé ce shell et ramené à l'invite de la VM, `illy@k3s-lab`.
+
+On a ensuite exécuté une commande ponctuelle, sans ouvrir de shell interactif :
+
+```sh
+kubectl exec pod-web -- nginx -v
+```
+
+Résultat observé : `nginx version: nginx/1.25.5`. Ces commandes fonctionnent aussi depuis Zorin avec le kubeconfig du cluster ; il n'est pas nécessaire d'ouvrir une connexion SSH à la VM pour utiliser `kubectl exec`.
+
+### Étape 6C — Diagnostic réseau avec netshoot
+
+Depuis Zorin, on a lancé un Pod temporaire contenant les outils de diagnostic :
+
+```sh
+kubectl run net-debug --image=nicolaka/netshoot --restart=Never -it --rm -- /bin/bash
+```
+
+À l'invite `net-debug:~#`, on a testé l'adresse de `pod-web`, `10.42.0.11` :
+
+```sh
+ping -c 3 10.42.0.11
+curl http://10.42.0.11
+```
+
+Le ping a reçu trois réponses pour trois paquets envoyés, avec 0 % de perte. La requête HTTP a renvoyé le HTML de la page « Welcome to nginx! ». La communication entre les Pods fonctionne donc, ainsi que l'accès au serveur HTTP de `pod-web` sur son port 80.
+
+Le premier essai de ping utilisait littéralement `IP_DU_POD_WEB` et a échoué : ce texte devait être remplacé par l'adresse réelle du Pod. Il ne s'agissait pas d'une panne du réseau du cluster.
+
+L'option `--restart=Never` évite de relancer le conteneur après la fermeture du shell ; `--rm` demande la suppression du Pod à la fin de la session. La commande `exit` permet de quitter ce shell. Le client `kubectl` s'exécute sur Zorin, mais les Pods tournent dans la VM : celle-ci doit donc rester allumée pour effectuer ces manipulations.
