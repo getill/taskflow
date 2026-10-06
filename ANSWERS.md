@@ -336,3 +336,44 @@ Le ping a reçu trois réponses pour trois paquets envoyés, avec 0 % de perte. 
 Le premier essai de ping utilisait littéralement `IP_DU_POD_WEB` et a échoué : ce texte devait être remplacé par l'adresse réelle du Pod. Il ne s'agissait pas d'une panne du réseau du cluster.
 
 L'option `--restart=Never` évite de relancer le conteneur après la fermeture du shell ; `--rm` demande la suppression du Pod à la fin de la session. La commande `exit` permet de quitter ce shell. Le client `kubectl` s'exécute sur Zorin, mais les Pods tournent dans la VM : celle-ci doit donc rester allumée pour effectuer ces manipulations.
+
+### Étape 7 — Résilience avec un ReplicaSet
+
+Le fichier `replicaset-echo.yaml` définit le ReplicaSet `echo-rs`, avec trois répliques de l'image `hashicorp/http-echo` et l'argument `-text=TP1_Architecture`. Le sélecteur `app: echo-server` correspond au label du modèle de Pods. Il permet au ReplicaSet d'identifier les Pods à superviser.
+
+Depuis Zorin, on a appliqué le manifeste et observé les Pods :
+
+```sh
+kubectl apply -f replicaset-echo.yaml
+kubectl get pods -l app=echo-server -w
+```
+
+Les trois Pods `echo-rs-8fk6q`, `echo-rs-df4m8` et `echo-rs-zv8hk` sont passés en `Running`, avec `1/1` conteneur prêt et aucun redémarrage, environ cinq secondes après leur création.
+
+Après avoir arrêté l'observation avec Ctrl+C, on a supprimé un Pod :
+
+```sh
+kubectl delete pod echo-rs-8fk6q
+kubectl get pods -l app=echo-server -w
+```
+
+Le ReplicaSet a créé un nouveau Pod nommé `echo-rs-szfzc`. Celui-ci est passé de `ContainerCreating` à `Running`, avec `1/1` conteneur prêt, à l'âge d'environ deux secondes. Les deux autres Pods sont restés en fonctionnement. Il s'agit d'un nouveau Pod, et non d'un redémarrage du Pod supprimé.
+
+Après Ctrl+C, on a vérifié l'état du ReplicaSet :
+
+```sh
+kubectl get rs echo-rs
+```
+
+Résultat observé :
+
+```text
+NAME      DESIRED   CURRENT   READY
+echo-rs   3         3         3
+```
+
+Le contrôleur du ReplicaSet compare en continu l'état réel à l'état souhaité (`replicas: 3`). Après la suppression, il détecte une réplique manquante et crée un Pod à partir du modèle pour rétablir le nombre demandé : c'est la réconciliation. Les trois répliques sont à nouveau présentes et prêtes, sans nouvelle application du manifeste.
+
+Ce test valide le remplacement d'un Pod supprimé. Les trois Pods tournent sur notre unique nœud : cela ne constitue pas une protection contre la panne de la VM entière.
+
+Les manipulations demandées jusqu'à l'étape 7 incluse sont terminées. L'étape 8 sur les Deployments n'a pas été commencée.
