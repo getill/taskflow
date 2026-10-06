@@ -229,3 +229,52 @@ Les vérifications suivantes ont été réalisées depuis Zorin :
 | `helm list -A` | `traefik` et `traefik-crd` en état `deployed` dans `kube-system` |
 
 Le Pod `test` utilisé pour valider l'installation a ensuite été supprimé. Il est distinct du Pod `pod-test` demandé à l'étape 4 du TP.
+
+### Étape 4A — Création impérative d'un Pod
+
+Depuis le terminal connecté en SSH à la VM, on a exécuté :
+
+```sh
+kubectl run pod-test --image=nginx:alpine
+kubectl get pods -o wide
+```
+
+Le Pod est d'abord apparu en `ContainerCreating`, puis en `Running`, avec `1/1` conteneur prêt et aucun redémarrage. Son adresse IP interne observée est `10.42.0.10`, sur le nœud `k3s-lab`. La création est impérative : on donne directement l'ordre à Kubernetes de créer un Pod, sans fichier YAML. L'option `-o wide` permet notamment de voir son adresse IP interne et le nœud qui l'héberge.
+
+Lors du passage au fichier YAML, la commande `cd` vers le projet a échoué dans la VM : ce dossier et `pod-web.yaml` se trouvent sur Zorin. Il faut donc exécuter la suite depuis le terminal du poste, avec le kubeconfig déjà configuré pour joindre le cluster distant.
+
+### Étape 4B — Création déclarative d'un Pod
+
+Le fichier `pod-web.yaml` décrit un Pod nommé `pod-web`, portant le label `component: frontend`. Il contient un conteneur `nginx-container` utilisant l'image `nginx:1.25`, avec le port 80 déclaré.
+
+Depuis la racine du projet sur Zorin, on a exécuté :
+
+```sh
+kubectl apply -f pod-web.yaml
+kubectl get pods -o wide
+```
+
+Kubernetes a répondu `pod/pod-web created`. Le premier affichage montrait `ContainerCreating`, juste après sa création. Contrairement à la méthode impérative, le fichier YAML conserve la description de l'état souhaité et peut être versionné avec le projet.
+
+### Étape 4C — Inspection et diagnostic
+
+On a inspecté les événements et les logs avec :
+
+```sh
+kubectl describe pod pod-web
+kubectl logs pod-web
+```
+
+La section `Events` montre les étapes suivantes, toutes de type `Normal` :
+
+| Événement | Observation et signification |
+| --- | --- |
+| `Scheduled` | Le scheduler a affecté `default/pod-web` au nœud `k3s-lab`. |
+| `Pulling` | Le kubelet a lancé le téléchargement de `nginx:1.25`. |
+| `Pulled` | L'image a été téléchargée avec succès en environ 5,3 secondes. |
+| `Created` | Le conteneur a été créé. |
+| `Started` | Le conteneur a démarré. |
+
+Les logs affichent `Configuration complete; ready for start up`, puis `nginx/1.25.5` et `start worker processes`, suivi du lancement de deux processus workers. Ils confirment le démarrage de Nginx sans erreur visible. Le tag `nginx:1.25` utilisé dans cet exercice correspond donc ici à la version 1.25.5.
+
+`get` résume l'état des Pods ; `describe` détaille leur configuration et les événements Kubernetes ; `logs` affiche les messages produits par le conteneur.
