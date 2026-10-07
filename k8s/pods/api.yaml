@@ -13,7 +13,7 @@ spec:
       env:
         - name: DB_HOST
           # ponytail: IP provisoire du Pod db ; utiliser un Service à la séance suivante.
-          value: "10.42.0.18"
+          value: "10.42.0.20"
         - name: DB_PORT
           value: "5432"
         - name: DB_NAME

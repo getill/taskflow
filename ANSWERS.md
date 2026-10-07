@@ -245,3 +245,57 @@ Résultats observés :
 Les trois réponses portent l'en-tête `X-Served-By: api`, qui correspond au nom du Pod. La création et la relecture confirment que l'API communique avec PostgreSQL ; `/healthz` vérifie seulement que le processus HTTP répond.
 
 La tâche nº 1 est conservée pour tester la persistance des données lors de la suppression du Pod de base à l'étape suivante.
+
+## Étape 5 — Limites de l'approche par Pods
+
+On a supprimé le Pod `db`, puis recréé la base avec le même manifeste :
+
+```sh
+kubectl delete pod db -n taskflow
+kubectl apply -f k8s/pods/db.yaml
+kubectl wait -n taskflow --for=condition=Ready pod/db --timeout=180s
+kubectl get pods -n taskflow -o wide
+```
+
+L'adresse du Pod `db` est passée de `10.42.0.18` à `10.42.0.20`. L'API est restée `Running`, avec aucun redémarrage, à `10.42.0.19`, mais sa variable `DB_HOST` désigne toujours l'ancienne adresse de la base.
+
+À travers le port-forward encore ouvert, `/healthz` a répondu `200 OK`, tandis que `/api/tasks` a répondu `500 Internal Server Error`, avec `{"error":"Erreur interne"}`. Le processus API est vivant, mais les opérations sur les tâches échouent. L'état `Running` et la route de vivacité ne garantissent donc pas que la dépendance PostgreSQL est accessible.
+
+Le manifeste API a été corrigé avec `DB_HOST=10.42.0.20` pour sa prochaine création. Ce changement du fichier ne modifie pas le Pod déjà lancé. Les constats de cette étape sont également consignés dans `docs/notes-kubernetes.md`.
+
+Après arrêt du port-forward, on a supprimé le Pod API :
+
+```sh
+kubectl delete pod api -n taskflow
+kubectl get pods -n taskflow
+```
+
+Plusieurs affichages successifs n'ont montré que le Pod `db`, toujours `Running`. Le Pod `api` n'a pas été recréé. Une seconde tentative de suppression a retourné `pods "api" not found`, confirmant son absence.
+
+Il manque un contrôleur, par exemple un Deployment s'appuyant sur un ReplicaSet, pour maintenir un nombre de répliques souhaité. Un fichier YAML conservé sur le poste ne constitue pas à lui seul une boucle de réconciliation. Le redémarrage d'un conteneur dans un Pod existant est un mécanisme distinct, testé ci-dessous.
+
+On a ensuite recréé l'API à partir du manifeste corrigé et rouvert le port-forward :
+
+```sh
+kubectl apply -f k8s/pods/api.yaml
+kubectl wait -n taskflow --for=condition=Ready pod/api --timeout=180s
+kubectl port-forward -n taskflow pod/api 18080:3000
+```
+
+Depuis un autre terminal, `/healthz` et `/api/tasks` ont tous deux répondu `200 OK`, avec `X-Served-By: api`. La liste des tâches est désormais vide (`[]`) : la tâche nº 1 présente avant suppression de la base a disparu. Cela confirme la perte des données en l'absence de volume persistant, indépendamment du problème d'adresse IP qui empêchait auparavant la lecture.
+
+Enfin, après arrêt du port-forward, on a arrêté le processus principal du conteneur API sans supprimer son Pod :
+
+```sh
+kubectl get pod api -n taskflow
+kubectl exec -n taskflow api -- sh -c 'kill 1'
+kubectl get pod api -n taskflow -w
+# Après Ctrl+C :
+kubectl logs -n taskflow api --previous --tail=15
+```
+
+Avant cette commande, `api` était `Running` et son compteur `RESTARTS` valait déjà 1. L'affichage a ensuite montré `Completed`, brièvement `CrashLoopBackOff`, puis `Running` avec `1/1` conteneur prêt et `RESTARTS=2`. Le nom du Pod est resté `api` et son âge a continué à augmenter : c'est le conteneur qui a été relancé.
+
+Les logs de l'exécution précédente montrent la base joignable sur `10.42.0.20:5432`, puis `Signal SIGTERM reçu : arrêt en cours` et `Arrêt terminé`. L'application a donc pris en charge le signal et s'est arrêtée proprement. Le bref `CrashLoopBackOff` correspond ici à l'attente avant relance, et non à une panne persistante après le test.
+
+La politique Kubernetes par défaut est `restartPolicy: Always` : le kubelet relance le conteneur même après un arrêt réussi, tant que le Pod existe. Notre `compose.yaml` de séance 1 ne définit pas de politique `restart` ; Docker utilise alors `no` par défaut. Une politique Docker `always` ou `unless-stopped` permettrait une relance automatique, mais ne recréerait pas un conteneur supprimé. Voir les documentations [Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts) et [Docker](https://docs.docker.com/engine/containers/start-containers-automatically/).
