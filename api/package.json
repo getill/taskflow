@@ -1,6 +1,6 @@
 {
   "name": "taskflow-api",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "API REST de TaskFlow : gestion de tâches",
   "private": true,
   "type": "module",
