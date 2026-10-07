@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: taskflow
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: taskflow
+      component: api
+  template:
+    metadata:
+      labels:
+        app: taskflow
+        component: api
+    spec:
+      containers:
+        - name: api
+          image: tlemray/taskflow-api:1.0.0
+          env:
+            - name: DB_HOST
+              value: db
+            - name: DB_PORT
+              # Évite la valeur tcp://... injectée par le Service db.
+              value: "5432"
+            - name: DB_NAME
+              value: taskflow
+            - name: DB_USER
+              value: taskflow
+            - name: DB_PASSWORD
+              # Mot de passe fictif réservé au TP, identique à celui de PostgreSQL.
+              value: taskflow-lab-only
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: taskflow
+spec:
+  type: ClusterIP
+  selector:
+    app: taskflow
+    component: api
+  ports:
+    - port: 3000
+      targetPort: 3000

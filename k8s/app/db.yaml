@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: taskflow
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: taskflow
+      component: db
+  template:
+    metadata:
+      labels:
+        app: taskflow
+        component: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18
+          env:
+            - name: POSTGRES_DB
+              value: taskflow
+            - name: POSTGRES_USER
+              value: taskflow
+            - name: POSTGRES_PASSWORD
+              # Mot de passe fictif réservé au TP.
+              value: taskflow-lab-only
+          ports:
+            - containerPort: 5432
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: taskflow
+spec:
+  type: ClusterIP
+  selector:
+    app: taskflow
+    component: db
+  ports:
+    - port: 5432
+      targetPort: 5432
