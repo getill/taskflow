@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api
+  namespace: taskflow
+  labels:
+    app: taskflow
+    component: api
+spec:
+  containers:
+    - name: api
+      image: tlemray/taskflow-api:1.0.0
+      env:
+        - name: DB_HOST
+          # ponytail: IP provisoire du Pod db ; utiliser un Service à la séance suivante.
+          value: "10.42.0.18"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: taskflow
+        - name: DB_USER
+          value: taskflow
+        - name: DB_PASSWORD
+          # Mot de passe fictif réservé au TP, identique à celui du Pod db.
+          value: taskflow-lab-only
+      ports:
+        - containerPort: 3000

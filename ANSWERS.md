@@ -205,3 +205,43 @@ kubectl exec -n taskflow db -- pg_isready -h 127.0.0.1 -U taskflow -d taskflow
 ```
 
 Les logs montrent la fin de l'initialisation, puis PostgreSQL 18.6 à l'écoute sur le port 5432 et le message `database system is ready to accept connections`. La commande `pg_isready` confirme `127.0.0.1:5432 - accepting connections`.
+
+## Étape 3 — Pod API
+
+Le manifeste `k8s/pods/api.yaml` utilise l'image publiée `tlemray/taskflow-api:1.0.0`, le namespace `taskflow` et les labels `app: taskflow` et `component: api`. Le conteneur expose son API sur le port 3000. Les variables `DB_NAME`, `DB_USER` et `DB_PASSWORD` correspondent à la configuration du Pod PostgreSQL, avec le même mot de passe fictif.
+
+Le nom `db` du service Docker Compose n'est pas automatiquement transposé en nom DNS Kubernetes. Aucun Service Kubernetes n'a encore été créé : `DB_HOST` contient donc provisoirement l'adresse du Pod de base, `10.42.0.18`, avec `DB_PORT=5432`. Cette adresse peut changer lors de la recréation du Pod, ce qui obligera à adapter la configuration de l'API.
+
+Après `kubectl apply -f k8s/pods/api.yaml`, Kubernetes a confirmé `pod/api created`. La commande d'attente a retourné `condition met`. Le Pod `api` est `Running`, avec `1/1` conteneur prêt, aucun redémarrage et l'adresse `10.42.0.19`, sur `k3s-lab`. Le Pod `db` reste `Running` à l'adresse `10.42.0.18`.
+
+La sortie des logs était vide lors de cette première vérification. L'état `Running` seul ne suffit pas à valider les échanges avec PostgreSQL : les requêtes HTTP de l'étape suivante vérifieront le fonctionnement de l'application.
+
+## Étape 4 — Vérification HTTP
+
+Le port local 3001 était déjà occupé (`address already in use`). On a donc ouvert le tunnel depuis le port 18080 de Zorin vers le port 3000 du Pod API :
+
+```sh
+kubectl port-forward -n taskflow pod/api 18080:3000
+```
+
+Dans un deuxième terminal, on a exécuté :
+
+```sh
+curl -i http://localhost:18080/healthz
+curl -i http://localhost:18080/api/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"Tester TaskFlow sur Kubernetes"}'
+curl -i http://localhost:18080/api/tasks
+```
+
+Résultats observés :
+
+| Requête | Résultat |
+| --- | --- |
+| `GET /healthz` | `200 OK`, avec `{"status":"ok","version":"1.0.0","hostname":"api"}` |
+| `POST /api/tasks` | `201 Created`, tâche nº 1 intitulée « Tester TaskFlow sur Kubernetes », avec `done: false` et `Location: /api/tasks/1` |
+| `GET /api/tasks` | `200 OK`, liste contenant la tâche nº 1 précédemment créée |
+
+Les trois réponses portent l'en-tête `X-Served-By: api`, qui correspond au nom du Pod. La création et la relecture confirment que l'API communique avec PostgreSQL ; `/healthz` vérifie seulement que le processus HTTP répond.
+
+La tâche nº 1 est conservée pour tester la persistance des données lors de la suppression du Pod de base à l'étape suivante.
