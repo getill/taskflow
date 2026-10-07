@@ -1,0 +1,7 @@
+# Configuration du service k3s : /etc/rancher/k3s/config.yaml dans la VM.
+# Ce fichier ne s'applique pas avec kubectl.
+node-ip: 192.168.56.10
+flannel-iface: enp0s8
+tls-san:
+  - 192.168.56.10
+write-kubeconfig-mode: "0644"

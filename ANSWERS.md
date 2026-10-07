@@ -176,3 +176,13 @@ Docker télécharge les images manquantes. Le site est ensuite accessible sur `h
 Les dépôts [taskflow-api](https://hub.docker.com/r/tlemray/taskflow-api) et [taskflow-front](https://hub.docker.com/r/tlemray/taskflow-front) sont publics. On a vérifié l'accès aux deux versions `1.0.0` sans connexion au compte Docker Hub. Ces images sont publiées pour Linux amd64.
 
 On a ensuite arrêté la stack sans supprimer les volumes, supprimé les images locales de l'API, du front et de PostgreSQL, puis relancé avec `docker compose up -d --wait`. Docker a bien téléchargé les trois images, sans rien construire. Le site et l'API fonctionnent, et les tâches présentes avant le test ont été conservées.
+
+# Fil rouge 2 — Premiers Pods TaskFlow sur Kubernetes
+
+Le sujet fourni est intitulé « Séance 4 — Projet fil rouge : premiers Pods TaskFlow sur Kubernetes ». On réutilise le cluster `k3s-lab` et les images publiées pendant la première séance. Le fichier `k8s/k3s-config.yaml` reprend la configuration du service k3s installée dans la VM ; ce n'est pas une ressource Kubernetes à appliquer avec `kubectl`.
+
+## Étape 1 — Namespace
+
+Le fichier `k8s/namespace.yaml` déclare le namespace `taskflow`. Depuis Zorin, `kubectl config current-context` a confirmé le contexte `k3s-lab`. Après `kubectl apply -f k8s/namespace.yaml`, Kubernetes a répondu `namespace/taskflow created`. La commande `kubectl get namespace taskflow` a confirmé son état `Active`.
+
+Les manifestes des Pods préciseront `metadata.namespace: taskflow`. C'est plus sûr que de dépendre du namespace par défaut du contexte : un tiers peut ainsi appliquer les fichiers sans créer les Pods par erreur dans `default` ou dans un autre namespace sélectionné sur son poste.
