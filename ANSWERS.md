@@ -186,3 +186,22 @@ Le sujet fourni est intitulé « Séance 4 — Projet fil rouge : premiers Pods 
 Le fichier `k8s/namespace.yaml` déclare le namespace `taskflow`. Depuis Zorin, `kubectl config current-context` a confirmé le contexte `k3s-lab`. Après `kubectl apply -f k8s/namespace.yaml`, Kubernetes a répondu `namespace/taskflow created`. La commande `kubectl get namespace taskflow` a confirmé son état `Active`.
 
 Les manifestes des Pods préciseront `metadata.namespace: taskflow`. C'est plus sûr que de dépendre du namespace par défaut du contexte : un tiers peut ainsi appliquer les fichiers sans créer les Pods par erreur dans `default` ou dans un autre namespace sélectionné sur son poste.
+
+## Étape 2 — Pod PostgreSQL
+
+Le manifeste `k8s/pods/db.yaml` reprend l'image `postgres:18` du service `db` de Compose, la base `taskflow` et l'utilisateur `taskflow`. Il déclare le port PostgreSQL `5432` et les labels `app: taskflow` et `component: db`.
+
+La variable de l'image PostgreSQL à renseigner est `POSTGRES_PASSWORD`. Compose lui transmettait la valeur de `DB_PASSWORD` depuis `.env`. Pour ce TP, le manifeste utilise directement la valeur fictive `taskflow-lab-only` ; le mot de passe réel du fichier `.env` n'est pas repris.
+
+Le volume nommé de Compose n'est pas transposé, conformément au sujet. Sans stockage persistant, supprimer le Pod fera perdre les données de cette base. Ce comportement sera testé à l'étape 5.
+
+Après application du manifeste, le Pod `db` est `Running`, avec `1/1` conteneur prêt, aucun redémarrage et l'adresse `10.42.0.18`, sur le nœud `k3s-lab`.
+
+Le premier affichage des logs montrait encore l'initialisation. Sans sonde de disponibilité, l'état `1/1` ne suffisait pas à confirmer que PostgreSQL acceptait déjà les connexions. On a donc vérifié :
+
+```sh
+kubectl logs -n taskflow db --tail=20
+kubectl exec -n taskflow db -- pg_isready -h 127.0.0.1 -U taskflow -d taskflow
+```
+
+Les logs montrent la fin de l'initialisation, puis PostgreSQL 18.6 à l'écoute sur le port 5432 et le message `database system is ready to accept connections`. La commande `pg_isready` confirme `127.0.0.1:5432 - accepting connections`.
