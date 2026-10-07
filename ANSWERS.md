@@ -299,3 +299,40 @@ Avant cette commande, `api` était `Running` et son compteur `RESTARTS` valait d
 Les logs de l'exécution précédente montrent la base joignable sur `10.42.0.20:5432`, puis `Signal SIGTERM reçu : arrêt en cours` et `Arrêt terminé`. L'application a donc pris en charge le signal et s'est arrêtée proprement. Le bref `CrashLoopBackOff` correspond ici à l'attente avant relance, et non à une panne persistante après le test.
 
 La politique Kubernetes par défaut est `restartPolicy: Always` : le kubelet relance le conteneur même après un arrêt réussi, tant que le Pod existe. Notre `compose.yaml` de séance 1 ne définit pas de politique `restart` ; Docker utilise alors `no` par défaut. Une politique Docker `always` ou `unless-stopped` permettrait une relance automatique, mais ne recréerait pas un conteneur supprimé. Voir les documentations [Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts) et [Docker](https://docs.docker.com/engine/containers/start-containers-automatically/).
+
+## Étape 6 — État final et point de contrôle
+
+Après les tests, l'application est de nouveau fonctionnelle. Le manifeste API utilise l'adresse actuelle de la base, `10.42.0.20`. Les seules valeurs de mot de passe présentes dans les manifestes sont les valeurs fictives `taskflow-lab-only` du TP.
+
+Les vérifications finales du 7 octobre 2026 ont donné les résultats suivants (extraits des sorties) :
+
+```text
+$ kubectl get nodes
+NAME      STATUS   ROLES           AGE   VERSION
+k3s-lab   Ready    control-plane   33h   v1.36.5+k3s1
+
+$ kubectl get pods -n taskflow -o wide
+NAME   READY   STATUS    RESTARTS        AGE     IP           NODE
+api    1/1     Running   2 (3m8s ago)    8m17s   10.42.0.21   k3s-lab
+db     1/1     Running   0               22m     10.42.0.20   k3s-lab
+```
+
+Avec `kubectl port-forward -n taskflow pod/api 18080:3000` ouvert dans un autre terminal :
+
+```text
+$ curl -i http://localhost:18080/healthz
+HTTP/1.1 200 OK
+X-Served-By: api
+Content-Type: application/json; charset=utf-8
+
+{"status":"ok","version":"1.0.0","hostname":"api"}
+
+$ curl -i http://localhost:18080/api/tasks
+HTTP/1.1 200 OK
+X-Served-By: api
+Content-Type: application/json; charset=utf-8
+
+[]
+```
+
+Les sorties du nœud, des Pods et de `/healthz` constituent les éléments demandés pour le point de contrôle. Les fichiers à versionner sont `k8s/k3s-config.yaml`, `k8s/namespace.yaml`, `k8s/pods/db.yaml`, `k8s/pods/api.yaml`, `docs/notes-kubernetes.md` et ce compte rendu. Le push et le dépôt du point de contrôle restent à effectuer.

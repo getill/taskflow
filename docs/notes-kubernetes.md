@@ -29,3 +29,9 @@ Le Pod a conservé le nom `api` et son âge a continué à augmenter. Son compte
 Avec la politique par défaut `restartPolicy: Always`, le kubelet relance le conteneur dans le Pod existant, y compris après un arrêt réussi. Cette surveillance locale fonctionne déjà sans Deployment. Elle ne remplace pas le contrôleur nécessaire pour recréer un Pod supprimé. Voir le [cycle de vie des Pods](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts).
 
 Dans notre `compose.yaml`, aucune politique `restart` n'est définie : le comportement Docker par défaut est `no`. Les politiques Docker `always` et `unless-stopped` permettent aussi de relancer un conteneur arrêté, mais pas de recréer un conteneur supprimé. Voir les [politiques de redémarrage Docker](https://docs.docker.com/engine/containers/start-containers-automatically/).
+
+## État final vérifié
+
+Le 7 octobre 2026, après les manipulations, le nœud `k3s-lab` est `Ready`. Dans le namespace `taskflow`, les Pods `db` (`10.42.0.20`) et `api` (`10.42.0.21`) sont `Running`, avec `1/1` conteneur prêt. Le compteur de redémarrages de l'API vaut 2 ; celui de la base vaut 0.
+
+Le port-forward `18080:3000` permet de joindre `/healthz` et `/api/tasks`, qui répondent tous deux `200 OK`, avec `X-Served-By: api`. La liste des tâches est vide après le test de perte des données. Le manifeste API contient la bonne adresse de base ; il faudra la réactualiser si le Pod `db` est recréé avec une autre IP, jusqu'à l'introduction d'un Service.
